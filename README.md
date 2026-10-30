@@ -2,9 +2,9 @@
 
 Developed by Nathan I Keiter, Gettysburg College.
 
-A secure, admin-only web console for managing and reporting Open WebUI token usage. It is the graphical
-counterpart of the token-usage administration CLI and works on the same database objects created by the
-custom usage tracking filter (v1.2.0+).
+A secure, admin-only web console for managing and reporting [Open WebUI](https://github.com/open-webui/open-webui) token usage. It is the graphical (GUI)
+version of the [owui-token-usage-admin](https://github.com/nkeiter/owui-token-usage-admin) CLI and works on the same database objects created by the
+required [owui-token-usage-tracking-plugin](https://github.com/nkeiter/owui-token-usage-tracking-plugin) usage tracking filter (v1.2.0+).
 
 It runs as a single AWS Lambda function (`owui-token-usage-management-console`) behind an API Gateway HTTP API.
 It does not modify Open WebUI itself.
@@ -232,7 +232,7 @@ Open WebUI usage-tracking filter source file. SAM CLI and Docker are **not** nee
    name in config; keep DSN credentials in Secrets Manager.
 4. Set `filter_file` to the current usage tracking filter source. The path is relative to the project directory
    unless absolute. The deploy script extracts its tier-function SQL. This file is not part of this repository:
-   it must be a copy of the usage tracking plugin's filter source that contains the
+   it must be a copy of the [usage tracking plugin's](https://github.com/nkeiter/owui-token-usage-tracking-plugin) filter source that contains the
    `-- BEGIN tier-functions` and `-- END tier-functions` markers.
 5. To use a custom site hostname, set that environment's `custom_domain_name` and `certificate_arn` and update
    your organization's DNS (see [Custom domains](#custom-domains)). Leave both empty to use the default Amazon
@@ -395,6 +395,22 @@ and the configured friendly URL, so either address can sign in.
 | 401 after being signed in for a while | The access token expired (60 min); sign in again. |
 | Friendly URL does not resolve | Confirm the DNS CNAME and certificate/domain settings. |
 | Tab data differs from Open WebUI's native reports | Confirm the configured `usage_timezone` matches the filter and the reporting timezone expected by your users. |
+
+## Related projects
+
+- [owui-token-usage-tracking-plugin](https://github.com/nkeiter/owui-token-usage-tracking-plugin):
+  the required Open WebUI filter plugin that creates and enforces the usage
+  tables and tiers this console manages.
+- [owui-token-usage-admin](https://github.com/nkeiter/owui-token-usage-admin):
+  the command-line version of this console, useful as a fallback.
+- [Open WebUI](https://github.com/open-webui/open-webui): the application
+  these projects extend. Thank you to its authors and contributors.
+
+### Other related work by this author
+
+- [owui-scim-admin](https://github.com/nkeiter/owui-scim-admin): stand-alone
+  command-line utility for administering Open WebUI users and groups through
+  its SCIM 2.0 API.
 
 ## Disclaimer
 
