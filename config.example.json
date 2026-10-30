@@ -1,0 +1,49 @@
+{
+  "aws_profile": "your-aws-cli-profile",
+  "artifact_bucket_prefix": "your-app-artifacts",
+  "filter_file": "path/to/usage_tracking_filter.py",
+  "secret_dsn_key": "DATABASE_URL",
+  "usage_timezone": "UTC",
+  "usage_tier_prefix": "token-limit-",
+  "usage_builtin_tiers": [
+    "token-limit-enterprise",
+    "token-limit-pro",
+    "token-limit-standard",
+    "token-limit-test"
+  ],
+  "usage_default_tier": "token-limit-standard",
+  "usage_default_daily_tokens": 500000,
+  "usage_default_monthly_tokens": 5000000,
+  "environments": {
+    "dev": {
+      "aws_region": "us-west-2",
+      "vpc_id": "vpc-00000000000000000",
+      "private_subnet_ids": [
+        "subnet-00000000000000001",
+        "subnet-00000000000000002",
+        "subnet-00000000000000003"
+      ],
+      "database_security_group_id": "sg-00000000000000000",
+      "secret_id": "your-dev-database-secret",
+      "open_web_ui_url": "https://open-webui-dev.example.com",
+      "custom_domain_name": "",
+      "certificate_arn": "",
+      "cognito_domain_prefix": "your-unique-dev-prefix-123"
+    },
+    "prod": {
+      "aws_region": "us-east-1",
+      "vpc_id": "vpc-00000000000000004",
+      "private_subnet_ids": [
+        "subnet-00000000000000005",
+        "subnet-00000000000000006",
+        "subnet-00000000000000007"
+      ],
+      "database_security_group_id": "sg-00000000000000008",
+      "secret_id": "your-prod-database-secret",
+      "open_web_ui_url": "https://open-webui.example.com",
+      "custom_domain_name": "",
+      "certificate_arn": "",
+      "cognito_domain_prefix": "your-unique-prod-prefix-123"
+    }
+  }
+}

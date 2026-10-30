@@ -1,0 +1,257 @@
+# Developed by Nathan I Keiter, Gettysburg College.
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: Open WebUI token usage management console (Lambda + API Gateway HTTP API + Cognito)
+
+Parameters:
+  EnvironmentName:
+    Type: String
+    Default: dev
+  FunctionName:
+    Type: String
+    Default: owui-token-usage-management-console
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+  PrivateSubnetIds:
+    Type: List<AWS::EC2::Subnet::Id>
+    Description: Private subnets with a NAT route (Lambda needs Secrets Manager + Cognito access)
+  DatabaseSecurityGroupId:
+    Type: AWS::EC2::SecurityGroup::Id
+  SecretId:
+    Type: String
+    Description: Secrets Manager secret holding the database DSN
+  SecretDsnKey:
+    Type: String
+    Default: DATABASE_URL
+    Description: JSON key in the secret containing the database DSN
+  CognitoDomainPrefix:
+    Type: String
+    Description: Globally unique prefix for the Cognito hosted login domain
+  OpenWebUiUrl:
+    Type: String
+    Default: ""
+    Description: Base URL of the matching Open WebUI site; used for the Groups link in the Users tab
+  CustomDomainName:
+    Type: String
+    Default: ""
+    Description: Optional friendly hostname. Needs CertificateArn and an external DNS CNAME.
+  CertificateArn:
+    Type: String
+    Default: ""
+    Description: ISSUED ACM certificate (same region) covering CustomDomainName
+  UsageTimezone:
+    Type: String
+    Default: UTC
+    Description: IANA timezone; must match the Open WebUI usage tracking filter
+  UsageTierPrefix:
+    Type: String
+    Default: token-limit-
+    Description: Prefix used to identify usage tier groups
+  UsageBuiltinTiers:
+    Type: String
+    Default: token-limit-enterprise,token-limit-pro,token-limit-standard,token-limit-test
+    Description: Comma-separated built-in tier group names in tie-break priority order
+  UsageDefaultTier:
+    Type: String
+    Default: token-limit-standard
+    Description: Built-in tier used for users without an assigned default tier
+  UsageDefaultDailyTokens:
+    Type: Number
+    Default: 500000
+    MinValue: -1
+    MaxValue: 1000000000000
+    Description: Fallback daily token limit for newly created tier rows
+  UsageDefaultMonthlyTokens:
+    Type: Number
+    Default: 5000000
+    MinValue: -1
+    MaxValue: 1000000000000
+    Description: Fallback monthly token limit for newly created tier rows
+
+Conditions:
+  HasCustomDomain: !And
+    - !Not [!Equals [!Ref CustomDomainName, ""]]
+    - !Not [!Equals [!Ref CertificateArn, ""]]
+
+Resources:
+  FunctionSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: owui token usage console Lambda
+      VpcId: !Ref VpcId
+
+  AuroraIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref DatabaseSecurityGroupId
+      IpProtocol: tcp
+      FromPort: 5432
+      ToPort: 5432
+      SourceSecurityGroupId: !Ref FunctionSecurityGroup
+      Description: owui token usage management console
+
+  UserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: !Sub "${FunctionName}-${EnvironmentName}"
+      UsernameAttributes: [email]
+      AutoVerifiedAttributes: [email]
+      MfaConfiguration: OPTIONAL
+      EnabledMfas: [SOFTWARE_TOKEN_MFA]
+      AdminCreateUserConfig:
+        AllowAdminCreateUserOnly: true
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 14
+          RequireLowercase: true
+          RequireUppercase: true
+          RequireNumbers: true
+          RequireSymbols: false
+          TemporaryPasswordValidityDays: 3
+      AccountRecoverySetting:
+        RecoveryMechanisms:
+          - Name: verified_email
+            Priority: 1
+
+  UserPoolDomain:
+    Type: AWS::Cognito::UserPoolDomain
+    Properties:
+      Domain: !Ref CognitoDomainPrefix
+      UserPoolId: !Ref UserPool
+
+  UserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      UserPoolId: !Ref UserPool
+      GenerateSecret: false
+      AllowedOAuthFlowsUserPoolClient: true
+      AllowedOAuthFlows: [code]
+      AllowedOAuthScopes: [openid, email]
+      SupportedIdentityProviders: [COGNITO]
+      CallbackURLs:
+        - !Sub "https://${HttpApi}.execute-api.${AWS::Region}.amazonaws.com/"
+        - !If [HasCustomDomain, !Sub "https://${CustomDomainName}/", !Ref AWS::NoValue]
+      LogoutURLs:
+        - !Sub "https://${HttpApi}.execute-api.${AWS::Region}.amazonaws.com/"
+        - !If [HasCustomDomain, !Sub "https://${CustomDomainName}/", !Ref AWS::NoValue]
+      AccessTokenValidity: 60
+      IdTokenValidity: 60
+      RefreshTokenValidity: 1
+      TokenValidityUnits:
+        AccessToken: minutes
+        IdToken: minutes
+        RefreshToken: days
+      PreventUserExistenceErrors: ENABLED
+
+  ConsoleFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Ref FunctionName
+      CodeUri: ./build
+      Handler: app.handler
+      Runtime: python3.12
+      Architectures: [arm64]
+      MemorySize: 512
+      Timeout: 20
+      Environment:
+        Variables:
+          SECRET_ID: !Ref SecretId
+          SECRET_DSN_KEY: !Ref SecretDsnKey
+          CLIENT_ID: !Ref UserPoolClient
+          COGNITO_DOMAIN: !Sub "https://${CognitoDomainPrefix}.auth.${AWS::Region}.amazoncognito.com"
+          ENVIRONMENT_NAME: !Ref EnvironmentName
+          OWUI_URL: !Ref OpenWebUiUrl
+          USAGE_TIMEZONE: !Ref UsageTimezone
+          USAGE_TIER_PREFIX: !Ref UsageTierPrefix
+          USAGE_BUILTIN_TIERS: !Ref UsageBuiltinTiers
+          USAGE_DEFAULT_TIER: !Ref UsageDefaultTier
+          USAGE_DEFAULT_DAILY_TOKENS: !Ref UsageDefaultDailyTokens
+          USAGE_DEFAULT_MONTHLY_TOKENS: !Ref UsageDefaultMonthlyTokens
+      VpcConfig:
+        SecurityGroupIds: [!Ref FunctionSecurityGroup]
+        SubnetIds: !Ref PrivateSubnetIds
+      Policies:
+        - AWSLambdaVPCAccessExecutionRole
+        - Statement:
+            - Effect: Allow
+              Action: secretsmanager:GetSecretValue
+              Resource: !Sub "arn:${AWS::Partition}:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:${SecretId}-*"
+
+  FunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${FunctionName}"
+      RetentionInDays: 90
+
+  HttpApi:
+    Type: AWS::ApiGatewayV2::Api
+    Properties:
+      Name: !Sub "${FunctionName}-${EnvironmentName}"
+      ProtocolType: HTTP
+
+  HttpApiIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref HttpApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !GetAtt ConsoleFunction.Arn
+      PayloadFormatVersion: "2.0"
+
+  HttpApiRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: $default
+      Target: !Sub "integrations/${HttpApiIntegration}"
+
+  HttpApiStage:
+    Type: AWS::ApiGatewayV2::Stage
+    Properties:
+      ApiId: !Ref HttpApi
+      StageName: $default
+      AutoDeploy: true
+      DefaultRouteSettings:
+        ThrottlingBurstLimit: 20
+        ThrottlingRateLimit: 10
+
+  HttpApiInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref ConsoleFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${HttpApi}/*"
+
+  CustomDomain:
+    Type: AWS::ApiGatewayV2::DomainName
+    Condition: HasCustomDomain
+    Properties:
+      DomainName: !Ref CustomDomainName
+      DomainNameConfigurations:
+        - CertificateArn: !Ref CertificateArn
+          EndpointType: REGIONAL
+          SecurityPolicy: TLS_1_2
+
+  CustomDomainMapping:
+    Type: AWS::ApiGatewayV2::ApiMapping
+    Condition: HasCustomDomain
+    DependsOn: HttpApiStage
+    Properties:
+      DomainName: !Ref CustomDomain
+      ApiId: !Ref HttpApi
+      Stage: $default
+
+Outputs:
+  ConsoleUrl:
+    Value: !Sub "https://${HttpApi}.execute-api.${AWS::Region}.amazonaws.com/"
+  CustomDomainUrl:
+    Condition: HasCustomDomain
+    Value: !Sub "https://${CustomDomainName}/"
+  CustomDomainCnameTarget:
+    Condition: HasCustomDomain
+    Description: Create a CNAME from the friendly hostname to this value in the external DNS
+    Value: !GetAtt CustomDomain.RegionalDomainName
+  UserPoolId:
+    Value: !Ref UserPool
+  FunctionName:
+    Value: !Ref ConsoleFunction

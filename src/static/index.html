@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Open WebUI Token Usage Console</title>
+  <link rel="stylesheet" href="/app.css">
+</head>
+<body>
+  <header>
+    <h1>Token Usage Console <span id="env" class="badge"></span></h1>
+    <nav id="nav" hidden>
+      <button data-tab="dashboard" class="active">Dashboard</button>
+      <button data-tab="users">Users</button>
+      <button data-tab="tiers">Tiers</button>
+      <button data-tab="reports">Reports</button>
+      <button data-tab="audit">Tier Audit</button>
+    </nav>
+    <div class="spacer"></div>
+    <span id="tz" class="muted"></span>
+    <button id="logout" hidden>Sign out</button>
+  </header>
+  <div id="toast" role="status"></div>
+  <div id="banner" class="notice warnbar" hidden></div>
+  <main id="main"><p class="muted">Loading…</p></main>
+  <script src="/chart.umd.js"></script>
+  <script src="/app.js"></script>
+</body>
+</html>
