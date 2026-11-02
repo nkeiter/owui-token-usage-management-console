@@ -132,6 +132,46 @@ match the filter's SQL timezone.
 Not yet implemented relative to the CLI: `set-all-limits` (bulk update) and the CLI's per-user quota-percent report.
 The CLI has matching `create-tier`, `delete-tier`, `add-users` and `import-tiers` commands.
 
+## Interface screenshots
+
+The screenshots below show the Dashboard, Users, Tiers, Reports, and Tier Audit pages. They were captured
+from the local demo using fictional names and usage data; no production data is shown.
+
+### Dashboard
+
+![Dashboard with token totals, usage charts, and users closest to their limits](screenshots/dashboard.png)
+
+*The Dashboard summarizes daily and monthly usage, highlights users over or near their limits, and charts
+daily usage and month-to-date tokens by tier.*
+
+### Users
+
+![Users page with tier assignments, usage limits, and utilization percentages](screenshots/users.png)
+
+*The Users page lists each user's tiers, daily and monthly usage, limit utilization, and available
+management actions.*
+
+### Tiers
+
+![Tiers page showing built-in and custom tiers, member counts, and token limits](screenshots/tiers.png)
+
+*The Tiers page shows built-in and custom tiers, their member counts, token limits, descriptions, and
+controls for editing and managing membership.*
+
+### Reports
+
+![Reports page with date and tier filters, charts, and a top-users table](screenshots/reports.png)
+
+*The Reports page combines date and tier filters with daily, per-user, per-tier, and per-model usage
+charts, a detailed table, and CSV export.*
+
+### Tier Audit
+
+![Tier Audit page highlighting users in multiple default tiers or no default tier](screenshots/tier_audit.png)
+
+*The Tier Audit page identifies users with conflicting or missing default-tier group membership and
+provides controls to resolve those assignments.*
+
 ## Architecture
 
 ```
@@ -211,6 +251,7 @@ owui-token-usage-management-console/
 ├── template.yaml      # SAM/CloudFormation: Lambda, HTTP API, Cognito, IAM, SGs, log group, optional custom domain
 ├── config.example.json
 ├── examples/          # synthetic sample CSV imports
+├── screenshots/       # fictional-data UI screenshots embedded in this README
 ├── src/
 │   ├── app.py         # Lambda handler: static hosting, auth, API, SQL
 │   └── static/        # index.html, app.js, app.css, chart.umd.js (Chart.js 4.4.4, vendored)
